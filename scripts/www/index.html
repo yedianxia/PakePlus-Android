@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>大肥鱼的打卡日历</title>
+    <style>
+        /* ===================== 样式区 ===================== */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        /* 禁止整个页面横向滚动，只允许内部滑动容器动 */
+        body { overflow-x: hidden; background-color: #eef7ff; padding: 0; color: #333; position: relative; -webkit-font-smoothing: antialiased; }
+
+        #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, #eef7ff 0%, #f8fbff 100%); background-size: cover; background-position: center; z-index: -2; transition: background-image 0.3s; }
+        #overlay-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(3px); z-index: -1; pointer-events: none; transition: background-color 0.2s, backdrop-filter 0.2s; }
+
+        /* 顶部固定区域（标题和导航） */
+        .header-area { padding: 16px 16px 0 16px; position: relative; z-index: 10; }
+        
+        .top-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 4px; padding-right: 5px;}
+        .btn-mini { background: #e6f2ff; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #007bff; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        .btn-mini:active { background: #cce5ff; transform: scale(0.95); }
+
+        h2 { display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; color: #007bff; margin-bottom: 10px; font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+        .title-icon { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; vertical-align: middle; }
+
+        /* 分页导航 Tabs */
+        .page-tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
+        .page-tab-btn { 
+            flex: 1; max-width: 140px; padding: 10px 0; background: rgba(255,255,255,0.7); 
+            border: 1px solid #d0e8ff; border-radius: 14px; font-size: 15px; font-weight: bold; 
+            color: #7f8c8d; cursor: pointer; transition: 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+        .page-tab-btn.active { 
+            background: #007bff; color: white; border-color: #007bff; 
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3); transform: translateY(-2px);
+        }
+
+        /* ===================== 滑动核心容器 ===================== */
+        .swipe-wrapper { width: 100%; overflow: hidden; }
+        .swipe-content { 
+            display: flex; width: 200%; 
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* 丝滑过渡动画 */
+        }
+        
+        .page-container { 
+            width: 50%; padding: 0 16px 80px 16px; flex-shrink: 0;
+        }
+
+        /* 卡片通用样式 */
+        .card { background: rgba(255, 255, 255, 0.96); padding: 18px; border-radius: 20px; box-shadow: 0 6px 24px rgba(0,123,255,0.05); margin-bottom: 16px; border: 1px solid #f0f4f8; }
+        
+        /* 大肥鱼与箴言 */
+        .avatar-container { text-align: center; margin-bottom: 8px; }
+        .avatar-container img { width: 70px; height: auto; object-fit: contain; border-radius: 20px; box-shadow: 0 6px 18px rgba(0,123,255,0.15); transition: transform 0.3s; }
+        .daily-quote {
+            text-align: center; font-size: 13px; color: #7f8c8d; margin-bottom: 16px; 
+            padding: 12px 15px; background: rgba(255,255,255,0.8); border-radius: 12px;
+            border: 1px dashed #cce5ff; line-height: 1.6; font-style: italic;
+            box-shadow: 0 2px 10px rgba(0,123,255,0.03); min-height: 60px; display: flex; flex-direction: column; justify-content: center;
+        }
+        .quote-content { color: #2c3e50; font-weight: bold; font-family: "STKaiti", "KaiTi", serif; font-size: 15px;}
+        .quote-author { margin-top: 6px; font-size: 12px; color: #95a5a6; }
+
+        /* 统计图表区 */
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .chart-title { font-weight: bold; font-size: 14px; color: #007bff; }
+        .period-tabs { display: flex; gap: 2px; background: #f0f4f8; padding: 3px; border-radius: 10px;}
+        .period-btn { background: none; border: none; padding: 6px 10px; font-size: 12px; border-radius: 8px; color: #666; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        .period-btn.active { background: #fff; color: #007bff; box-shadow: 0 2px 6px rgba(0,0,0,0.08);}
+        .chart-total { font-size: 13px; color: #888; margin-bottom: 12px; }
+        .chart-total span { color: #007bff; font-weight: bold; font-size: 16px; }
+        .chart-container { display: flex; flex-direction: column; gap: 12px; }
+        .chart-item { display: flex; align-items: center; font-size: 13px; }
+        .chart-label { width: 70px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-right: 10px; color: #555; text-align: right; font-weight: 500;}
+        .chart-bar-bg { flex: 1; background: #f0f4f8; height: 12px; border-radius: 6px; overflow: hidden; }
+        .chart-bar-fill { height: 100%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .chart-value { width: 30px; text-align: right; font-weight: bold;}
+
+        /* 列表区 */
+        .item-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #f0f4f8;}
+        .item-list-title { font-weight: bold; color: #2c3e50; font-size: 15px;}
+        
+        .item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f4f6f9; padding: 16px 0; gap: 12px; cursor: pointer; transition: background 0.2s;}
+        .item:active { background: #f8fbff; }
+        .item:last-child { border-bottom: none; padding-bottom: 4px;}
+        .item:first-child { padding-top: 4px;}
+        
+        .item-info { flex: 1; min-width: 0; }
+        .item-name { font-weight: bold; font-size: 16px; color: #2c3e50; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 6px;}
+        .item-meta { display: flex; align-items: center; gap: 8px;}
+        .item-type { font-size: 11px; color: #7f8c8d; background: #f0f4f8; padding: 3px 8px; border-radius: 6px;}
+        .item-total { font-size: 13px; font-weight: bold; }
+        
+        .action-btns { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+        
+        .btn-checkin { color: white; border: none; border-radius: 12px; padding: 10px 16px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); flex-shrink: 0;}
+        .btn-checkin:active { transform: scale(0.95); }
+        .btn-checkin.completed { background: #f0f0f0 !important; box-shadow: none !important; color: #aaa; cursor: not-allowed; }
+
+        .btn-log { background: #fff; color: #007bff; border: 1px solid #cce5ff; border-radius: 12px; width: 38px; height: 38px; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;}
+        .btn-log:active { background: #f0f8ff; transform: scale(0.9); }
+        .btn-undo-quick { background: #fff; color: #faad14; border: 1px solid #ffe58f; border-radius: 12px; width: 38px; height: 38px; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;}
+        .btn-undo-quick:active { background: #fffbe6; transform: scale(0.9); }
+
+        /* 排序按钮 */
+        .btn-sort-toggle { background: #fff; color: #007bff; border: 1px solid #cce5ff; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .btn-sort-toggle.active { background: #007bff; color: #fff; border-color: #007bff; }
+        .btn-sort-arrow { background: #f8fbff; color: #007bff; border: 1px solid #e6f2ff; border-radius: 12px; width: 42px; height: 42px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;}
+        .btn-sort-arrow:active { background: #e6f2ff; transform: scale(0.9); }
+        .btn-sort-arrow:disabled { opacity: 0.3; cursor: not-allowed;}
+
+        /* 悬浮添加按钮 (FAB) */
+        .fab-btn {
+            position: fixed; bottom: 30px; right: 20px; width: 60px; height: 60px;
+            background: #007bff; color: white; border: none; border-radius: 50%;
+            font-size: 32px; font-weight: normal; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 8px 24px rgba(0,123,255,0.4); cursor: pointer; z-index: 99;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .fab-btn:active { transform: scale(0.9); box-shadow: 0 4px 12px rgba(0,123,255,0.3); }
+
+        /* 日历区 */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 0 10px;}
+        .month-picker { border: none; background: transparent; color: #2c3e50; font-size: 17px; font-weight: bold; text-align: center; outline: none; cursor: pointer; -webkit-appearance: none; appearance: none; }
+        .month-picker::-webkit-calendar-picker-indicator { display: none; }
+        .btn-month { background: #f0f8ff; border: none; color: #007bff; font-size: 16px; font-weight: bold; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;}
+        
+        #calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+        .weekday { font-size: 12px; color: #95a5a6; margin-bottom: 6px; font-weight: bold;}
+        .day { padding: 8px 0; border-radius: 12px; background: #fafbfc; font-size: 15px; color: #34495e; cursor: pointer; transition: 0.2s; position: relative; min-height: 48px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid transparent;}
+        .day.empty { background: transparent; cursor: default; border: none;}
+        .day.has-record { background: #e6f2ff; font-weight: bold; color: #007bff; border: 1px solid #cce5ff;}
+        .day-badge { font-size: 10px; background: #007bff; color: white; padding: 0px 6px; border-radius: 10px; margin-top: 3px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,123,255,0.2);}
+
+        /* 弹窗通用 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: flex-end; }
+        .modal-content { background: white; width: 100%; max-height: 85vh; border-radius: 24px 24px 0 0; padding: 24px; overflow-y: auto; animation: slideUp 0.3s cubic-bezier(0.1, 0.8, 0.2, 1); }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .close-btn { background: #f0f4f8; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 20px; color: #7f8c8d; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.2s;}
+
+        /* 输入区 */
+        .input-group { display: flex; flex-direction: column; gap: 12px; }
+        .input-row { display: flex; gap: 10px; align-items: center; }
+        input[type="text"], textarea, select { flex: 1; min-height: 44px; padding: 10px 14px; border: 1.5px solid #eef2f6; border-radius: 12px; font-size: 14px; outline: none; transition: 0.2s; background: #fafbfc; color: #333; }
+        input[type="text"]:focus, textarea:focus, select:focus { border-color: #007bff; background: #fff; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+        input[type="color"] { -webkit-appearance: none; border: 1.5px solid #eef2f6; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; padding: 2px; background: #fff;}
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
+        button.add-btn { min-height: 44px; padding: 0 20px; background: #007bff; color: white; border: none; border-radius: 12px; font-size: 15px; cursor: pointer; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 12px rgba(0,123,255,0.25); display: flex; justify-content: center; align-items: center;}
+        button.add-btn:active { transform: scale(0.96); }
+        .log-textarea { width: 100%; height: 120px; resize: none; font-size: 14px; line-height: 1.5; margin-bottom: 16px; padding: 14px;}
+
+        /* 操作菜单 */
+        .action-menu-btn { width: 100%; padding: 16px; text-align: left; background: #fafbfc; border: none; border-radius: 12px; margin-bottom: 10px; font-size: 15px; color: #333; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; font-weight: 500;}
+        .action-menu-btn:active { background: #eef2f6; }
+        .action-menu-btn.danger { color: #ff4d4f; background: #fff0f0; }
+
+        /* 补签列表 */
+        .makeup-item-btn { width: 100%; padding: 16px; text-align: left; background: #f8fbff; border: 1px solid #e6f2ff; border-radius: 12px; margin-bottom: 12px; font-size: 15px; color: #2c3e50; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s;}
+        .makeup-item-btn:active { background: #e6f2ff; transform: scale(0.98); }
+
+        /* 记录项 */
+        .record-item { display: flex; flex-direction: column; padding: 14px 0; border-bottom: 1px dashed #f0f4f8; font-size: 14px; }
+        .record-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;}
+        .record-note { background: #f8fbff; padding: 10px 12px; border-radius: 8px; color: #555; font-size: 14px; line-height: 1.5; word-break: break-all; border-left: 4px solid #b3d7ff; font-style: italic;}
+        .btn-edit-log { background: #f0f8ff; border: 1px solid #cce5ff; color: #007bff; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; margin-right: 6px;}
+        .btn-undo-single { background: #fff; border: 1px solid #ffcccc; color: #ff4d4f; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold;}
+
+        /* 背景控制UI */
+        .bg-setting-group { background: #fafbfc; padding: 16px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #eef2f6; }
+        .bg-setting-title { font-size: 14px; font-weight: bold; color: #2c3e50; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;}
+        .bg-setting-val { color: #007bff; font-size: 13px; background: #e6f2ff; padding: 2px 8px; border-radius: 10px;}
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #e6f2ff; border-radius: 3px; outline: none; margin: 10px 0; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: #007bff; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,123,255,0.4); }
+
+        /* Toast */
+        #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0, 123, 255, 0.95); color: white; padding: 16px 24px; border-radius: 24px; font-size: 15px; font-weight: bold; box-shadow: 0 12px 30px rgba(0,123,255,0.4); z-index: 9999; opacity: 0; pointer-events: none; transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 12px; max-width: 85%; text-align: left; border: 2px solid #fff;}
+        #toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #toast-icon { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background-color: #fff; flex-shrink: 0;}
+        #toast-text { line-height: 1.4; }
+        #toast.error { background: rgba(255, 77, 79, 0.95); }
+        #toast.success { background: rgba(82, 196, 26, 0.95); }
+
+        /* 确认弹窗 */
+        #confirmModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+        .confirm-box { background: white; width: 85%; max-width: 340px; border-radius: 20px; padding: 28px; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.15); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .confirm-title { font-size: 19px; font-weight: bold; color: #2c3e50; margin-bottom: 14px; }
+        .confirm-msg { font-size: 16px; color: #555; line-height: 1.6; margin-bottom: 28px; text-align: left; white-space: pre-wrap;}
+        .confirm-btns { display: flex; gap: 14px; }
+        .confirm-btn { flex: 1; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .confirm-btn.cancel { background: #f0f4f8; color: #7f8c8d; }
+        .confirm-btn.ok { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <div id="bg-layer"></div>
+    <div id="overlay-layer"></div>
+
+    <div id="toast">
+        <img src="https://img.aigengtu.com/meme/1048.webp" id="toast-icon" alt="DeepSeek">
+        <span id="toast-text"></span>
+    </div>
+
+    <div id="confirmModal">
+        <div class="confirm-box">
+            <div class="confirm-title" id="confirmTitle">提示</div>
+            <div class="confirm-msg" id="confirmMsg">确定要执行此操作吗？</div>
+            <div class="confirm-btns">
+                <button class="confirm-btn cancel" onclick="closeConfirm(false)">取消</button>
+                <button class="confirm-btn ok" onclick="closeConfirm(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 顶部固定区域 -->
+    <div class="header-area">
+        <div class="top-actions">
+            <button class="btn-mini" onclick="openBgModal()">🎨 背景</button>
+            <button class="btn-mini" onclick="openDataModal('export')">📤 备份</button>
+            <button class="btn-mini" onclick="openDataModal('import')">📥 恢复</button>
+        </div>
+
+        <h2>
+            <img src="http://www.gcjw.cn/resource/images/934743a529b34b5387e10ca4b3f672b0_2.png" class="title-icon" alt="DeepSeek">
+            大肥鱼的打卡日历
+        </h2>
+        
+        <div class="page-tabs">
+            <button class="page-tab-btn active" id="tab-btn-checkin" onclick="switchPage(0)">📝 打卡</button>
+            <button class="page-tab-btn" id="tab-btn-calendar" onclick="switchPage(1)">📅 日历</button>
+        </div>
+    </div>
+
+    <!-- 滑动容器 -->
+    <div class="swipe-wrapper" id="swipeWrapper">
+        <div class="swipe-content" id="swipeContent">
+            
+            <!-- ===================== 页面1：打卡页 ===================== -->
+            <div class="page-container" id="page-checkin">
+                <div class="avatar-container">
+                    <img src="https://img.aigengtu.com/meme/1899.png" alt="DeepSeek大肥鱼" onerror="this.src='https://api.iconify.design/noto:fish.svg'">
+                </div>
+                <div class="daily-quote" id="dailyQuoteContainer">
+                    <div class="quote-content" id="quoteContent">正在网上寻找今日份的鼓励...</div>
+                    <div class="quote-author" id="quoteAuthor"></div>
+                </div>
+
+                <div class="card">
+                    <div class="chart-header">
+                        <div class="chart-title">📊 坚持数据可视化</div>
+                        <div class="period-tabs">
+                            <button class="period-btn" onclick="switchPeriod('today')">今日</button>
+                            <button class="period-btn active" onclick="switchPeriod('week')">本周</button>
+                            <button class="period-btn" onclick="switchPeriod('month')">本月</button>
+                            <button class="period-btn" onclick="switchPeriod('all')">全部</button>
+                        </div>
+                    </div>
+                    <div id="chartTotalHtml" class="chart-total"></div>
+                    <div class="chart-container" id="chartContainer"></div>
+                </div>
+
+                <div class="card">
+                    <div class="item-list-header">
+                        <span class="item-list-title">我的打卡项目</span>
+                        <button class="btn-sort-toggle" id="sortToggleBtn" onclick="toggleSortMode()">↕️ 排序</button>
+                    </div>
+                    <div id="itemList"></div>
+                    <div id="emptyMsg" style="text-align: center; color: #bdc3c7; font-size: 14px; padding: 20px 0;">空空如也，点击右下角添加一个事项吧~</div>
+                </div>
+            </div>
+
+            <!-- ===================== 页面2：日历页 ===================== -->
+            <div class="page-container" id="page-calendar">
+                <div class="card">
+                    <div class="calendar-header">
+                        <button class="btn-month" onclick="changeMonth(-1)">&lt;</button>
+                        <input type="month" id="calendarMonthPicker" class="month-picker" onchange="jumpToMonth(event)">
+                        <button class="btn-month" onclick="changeMonth(1)">&gt;</button>
+                    </div>
+                    <div id="calendar"></div>
+                    <div style="text-align: center; font-size: 12px; color: #95a5a6; margin-top: 16px;">点击日期查看详情或补签</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 悬浮添加按钮 -->
+    <button class="fab-btn" onclick="showModal('addItemModal')">+</button>
+
+    <!-- 弹窗：添加新项目 -->
+    <div class="modal-overlay" id="addItemModal" onclick="closeModal(event, 'addItemModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">✨ 添加新事项</div>
+                <button class="close-btn" onclick="closeModal(null, 'addItemModal')">×</button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="itemName" placeholder="输入你要坚持的事项...">
+                <div class="input-row" style="margin-top: 10px;">
+                    <select id="itemType">
+                        <option value="count">🔢 按次数</option>
+                        <option value="day">📅 按天数</option>
+                        <option value="auto">🤖 每天自动</option>
+                    </select>
+                    <input type="color" id="itemColor" value="#007bff" title="选择专属颜色">
+                </div>
+                <button class="add-btn" onclick="addItem()" style="width: 100%; margin-top: 16px;">确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗：写日志打卡 -->
+    <div class="modal-overlay" id="logCheckInModal" onclick="closeModal(event, 'logCheckInModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="logCheckInTitle">✍️ 写日志并打卡</div>
+                <button class="close-btn" onclick="closeModal(null, 'logCheckInModal')">×</button>
+            </div>
+            <textarea id="logCheckInInput" class="log-textarea" placeholder="写点什么记录一下此刻吧..."></textarea>
+            <button class="add-btn" onclick="submitLogCheckIn()" style="width: 100%;">确认打卡并保存日志</button>
+        </div>
+    </div>
+
+    <!-- 弹窗：修改日志 -->
+    <div class="modal-overlay" id="editLogModal" onclick="closeModal(event, 'editLogModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="editLogModalTitle">✏️ 修改打卡日志</div>
+                <button class="close-btn" onclick="closeModal(null, 'editLogModal')">×</button>
+            </div>
+            <textarea id="editLogInput" class="log-textarea" placeholder="写点什么吧..."></textarea>
+            <button class="add-btn" onclick="saveEditLog()" style="width: 100%;">保存修改</button>
+        </div>
+    </div>
+
+    <!-- 弹窗：补签列表 -->
+    <div class="modal-overlay" id="makeUpListModal" onclick="closeModal(event, 'makeUpListModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">🪄 选择要补签的项目</div>
+                <button class="close-btn" onclick="closeModal(null, 'makeUpListModal')">×</button>
+            </div>
+            <div id="makeUpListContainer"></div>
+        </div>
+    </div>
+
+    <!-- 弹窗：补写日志 -->
+    <div class="modal-overlay" id="makeUpLogModal" onclick="closeModal(event, 'makeUpLogModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="makeUpLogTitle">🪄 补写日志</div>
+                <button class="close-btn" onclick="closeModal(null, 'makeUpLogModal')">×</button>
+            </div>
+            <div style="font-size: 14px; font-weight: bold; color: #555; margin-bottom: 10px;">给【<span id="selectedMakeUpItemName" style="color:#007bff;"></span>】补写日志：</div>
+            <textarea id="makeUpLogInput" class="log-textarea" placeholder="补一句当时的感受吧..."></textarea>
+            <div style="display: flex; gap: 10px;">
+                <button class="add-btn" onclick="backToMakeUpList()" style="flex: 1; background: #f0f4f8; color: #7f8c8d; box-shadow: none;">返回列表</button>
+                <button class="add-btn" onclick="submitMakeUp()" style="flex: 2; background: #52c41a; box-shadow: 0 3px 10px rgba(82,196,26,0.25);">确认补签</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗：日历详情 -->
+    <div class="modal-overlay" id="detailModal" onclick="closeModal(event, 'detailModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="modalDate">日期详情</div>
+                <button class="close-btn" onclick="closeModal(null, 'detailModal')">×</button>
+            </div>
+            <div id="modalBody"></div>
+            <button class="add-btn" onclick="openMakeUpList()" style="width: 100%; background: #faad14; box-shadow: 0 3px 10px rgba(250,173,20,0.25); margin-top: 20px;">🪄 为这一天补签</button>
+        </div>
+    </div>
+
+    <!-- 弹窗：操作菜单 -->
+    <div class="modal-overlay" id="actionMenuModal" onclick="closeModal(event, 'actionMenuModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="actionMenuTitle">管理事项</div>
+                <button class="close-btn" onclick="closeModal(null, 'actionMenuModal')">×</button>
+            </div>
+            <div id="actionMenuBody"></div>
+        </div>
+    </div>
+
+    <!-- 弹窗：撤销菜单 -->
+    <div class="modal-overlay" id="undoModal" onclick="closeModal(event, 'undoModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="undoTitle">选择撤销范围</div>
+                <button class="close-btn" onclick="closeModal(null, 'undoModal')">×</button>
+            </div>
+            <div id="undoBody"></div>
+        </div>
+    </div>
+
+    <!-- 弹窗：编辑项目 -->
+    <div class="modal-overlay" id="editModal" onclick="closeModal(event, 'editModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">✏️ 编辑项目</div>
+                <button class="close-btn" onclick="closeModal(null, 'editModal')">×</button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="editName">
+                <div class="input-row" style="margin-top: 12px;">
+                    <select id="editType">
+                        <option value="count">🔢 按次数</option>
+                        <option value="day">📅 按天数</option>
+                        <option value="auto">🤖 每天自动</option>
+                    </select>
+                    <input type="color" id="editColor">
+                </div>
+                <button class="add-btn" onclick="saveEdit()" style="width:100%; margin-top: 12px;">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗：数据备份 -->
+    <div class="modal-overlay" id="dataModal" onclick="closeModal(event, 'dataModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="dataModalTitle">数据备份</div>
+                <button class="close-btn" onclick="closeModal(null, 'dataModal')">×</button>
+            </div>
+            <textarea id="dataTextarea" style="width: 100%; height: 160px; padding: 14px; border: 1.5px solid #eef2f6; border-radius: 12px; font-size: 13px; margin-bottom: 16px; resize: none; outline:none; background: #fafbfc; line-height: 1.5;" placeholder="数据将显示在这里..."></textarea>
+            <button class="add-btn" id="dataActionBtn" style="width: 100%;">操作</button>
+        </div>
+    </div>
+
+    <!-- 弹窗：背景设置 -->
+    <div class="modal-overlay" id="bgModal" onclick="closeModal(event, 'bgModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">🎨 高定背景工坊</div>
+                <button class="close-btn" onclick="closeModal(null, 'bgModal')">×</button>
+            </div>
+            
+            <div class="bg-setting-group">
+                <div class="bg-setting-title">1. 选择背景图</div>
+                <div class="input-group" style="gap: 8px;">
+                    <input type="file" id="localBgInput" accept="image/*" style="display: none;" onchange="handleFileUpload(event)">
+                    <button class="add-btn" onclick="document.getElementById('localBgInput').click()" style="background: #52c41a;">📁 从相册选择</button>
+                    <div class="input-row" style="margin-top: 4px;">
+                        <input type="text" id="urlBgInput" placeholder="粘贴网络图片链接...">
+                        <button class="add-btn" onclick="setBgFromUrl()" style="padding: 0 16px;">应用</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-setting-group">
+                <div class="bg-setting-title">
+                    <span>2. 调节遮罩浓度</span>
+                    <span class="bg-setting-val" id="overlayValDisplay">75%</span>
+                </div>
+                <input type="range" id="overlaySlider" min="0" max="100" value="75" oninput="updateOverlay(this.value)">
+            </div>
+
+            <div class="bg-setting-group">
+                <div class="bg-setting-title">
+                    <span>3. 调节背景模糊度</span>
+                    <span class="bg-setting-val" id="blurValDisplay">3px</span>
+                </div>
+                <input type="range" id="blurSlider" min="0" max="20" value="3" oninput="updateBlur(this.value)">
+            </div>
+
+            <button class="add-btn" onclick="resetBg()" style="width: 100%; background: #ff4d4f; box-shadow: 0 3px 10px rgba(255,77,79,0.25); margin-top: 10px;">🔄 恢复默认背景</button>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // ===================== 核心数据与状态管理区 ==========================
+        // =====================================================================
+        let items = JSON.parse(localStorage.getItem('mySuperItems')) || [];
+        let viewDate = new Date(); 
+        let editingItemId = null;  
+        let currentUndoItemId = null; 
+        let chartPeriod = 'week'; 
+        
+        let pendingCheckInItemId = null; 
+        let currentDetailDate = ""; 
+        let makeUpTargetItemId = null; 
+        let editingLogInfo = { itemId: null, dateStr: '', timeStr: '' }; 
+        
+        let isSorting = false; 
+        let currentPageIndex = 0; // 🚨 当前页面索引 (0:打卡, 1:日历)
+
+        function getTodayStr() {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        }
+
+        function getTimeStr() {
+            const now = new Date();
+            return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        }
+
+        function saveData() {
+            localStorage.setItem('mySuperItems', JSON.stringify(items));
+            renderApp();
+        }
+
+        // =====================================================================
+        // ===================== 🌟 滑动页面切换逻辑 ===========================
+        // =====================================================================
+        
+        // 点击顶部按钮切换
+        function switchPage(index) {
+            currentPageIndex = index;
+            updateSwipeView();
+        }
+
+        // 更新视图位置和 Tab 高亮
+        function updateSwipeView() {
+            const content = document.getElementById('swipeContent');
+            // 移动整个画布：0% 对应第一页，-50% 对应第二页
+            content.style.transform = `translateX(-${currentPageIndex * 50}%)`;
+            
+            // 更新 Tab 高亮
+            document.getElementById('tab-btn-checkin').classList.toggle('active', currentPageIndex === 0);
+            document.getElementById('tab-btn-calendar').classList.toggle('active', currentPageIndex === 1);
+        }
+
+        // 🚨 触摸滑动事件监听
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let isSwiping = false;
+
+        const swipeWrapper = document.getElementById('swipeWrapper');
+
+        swipeWrapper.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+            isSwiping = false;
+            // 滑动时暂时取消过渡动画，跟随手指
+            document.getElementById('swipeContent').style.transition = 'none';
+        }, { passive: true });
+
+        swipeWrapper.addEventListener('touchmove', function(e) {
+            const currentX = e.changedTouches[0].screenX;
+            const currentY = e.changedTouches[0].screenY;
+            const deltaX = currentX - touchStartX;
+            const deltaY = currentY - touchStartY;
+
+            // 判断是否是水平滑动（水平位移大于垂直位移）
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                isSwiping = true;
+                // 如果已经在第一页，且向右滑（想看第一页的左边），给一个阻尼感
+                if ((currentPageIndex === 0 && deltaX > 0) || (currentPageIndex === 1 && deltaX < 0)) {
+                    document.getElementById('swipeContent').style.transform = `translateX(${-currentPageIndex * 50 - (deltaX / window.innerWidth) * 20}%)`;
+                } else {
+                    // 正常跟随手指滑动
+                    document.getElementById('swipeContent').style.transform = `translateX(calc(-${currentPageIndex * 50}% + ${deltaX}px))`;
+                }
+            }
+        }, { passive: true });
+
+        swipeWrapper.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            
+            // 恢复过渡动画
+            document.getElementById('swipeContent').style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+
+            if (isSwiping) {
+                const deltaX = touchEndX - touchStartX;
+                // 设定滑动阈值（50px）
+                if (deltaX > 50 && currentPageIndex > 0) {
+                    currentPageIndex--;
+                } else if (deltaX < -50 && currentPageIndex < 1) {
+                    currentPageIndex++;
+                }
+                // 回弹或切换
+                updateSwipeView();
+            }
+        });
+
+        // =====================================================================
+        // ===================== 🌟 全局弹窗管理器 =============================
+        // =====================================================================
+        function showModal(id) {
+            const overlays = document.querySelectorAll('.modal-overlay');
+            overlays.forEach(el => el.style.display = 'none');
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function closeModal(event, id) {
+            if (event && event.target.id !== id) return;
+            document.getElementById(id).style.display = 'none';
+        }
+
+        let confirmCallback = null;
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMsg').innerText = message;
+            document.getElementById('confirmModal').style.display = 'flex';
+            confirmCallback = callback;
+        }
+        function closeConfirm(isConfirm) {
+            document.getElementById('confirmModal').style.display = 'none';
+            if (isConfirm && confirmCallback) confirmCallback();
+            confirmCallback = null;
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastText = document.getElementById('toast-text');
+            toastText.innerText = message; 
+            toast.className = `show ${type}`;
+            clearTimeout(toast.timer);
+            toast.timer = setTimeout(() => { toast.className = ''; }, 2000); 
+        }
+
+        // =====================================================================
+        // ===================== 🌟 排序魔法功能 ===============================
+        // =====================================================================
+        function toggleSortMode() {
+            isSorting = !isSorting;
+            const btn = document.getElementById('sortToggleBtn');
+            if (isSorting) {
+                btn.innerText = '✅ 完成';
+                btn.classList.add('active');
+                showToast('进入排序模式，使用上下箭头调整', 'info');
+            } else {
+                btn.innerText = '↕️ 排序';
+                btn.classList.remove('active');
+                showToast('排序已保存', 'success');
+            }
+            renderList();
+        }
+
+        function moveItem(index, direction) {
+            if (direction === -1 && index > 0) {
+                [items[index - 1], items[index]] = [items[index], items[index - 1]];
+            } else if (direction === 1 && index < items.length - 1) {
+                [items[index + 1], items[index]] = [items[index], items[index + 1]];
+            }
+            saveData(); 
+        }
+
+        // =====================================================================
+        // ===================== 🌟 联网获取每日箴言 ===========================
+        // =====================================================================
+        async function loadDailyQuote() {
+            const todayStr = getTodayStr();
+            const cacheKey = `dailyQuote_${todayStr}`;
+            const cachedData = localStorage.getItem(cacheKey);
+            
+            const quoteContentEl = document.getElementById('quoteContent');
+            const quoteAuthorEl = document.getElementById('quoteAuthor');
+
+            if (cachedData) {
+                const parsed = JSON.parse(cachedData);
+                quoteContentEl.innerText = `“${parsed.content}”`;
+                quoteAuthorEl.innerText = parsed.author;
+                return;
+            }
+
+            try {
+                quoteContentEl.innerText = "大肥鱼正在网上寻找今日份的鼓励...";
+                quoteAuthorEl.innerText = "";
+                const res = await fetch(`https://v1.hitokoto.cn/?c=d&c=i&c=k&encode=json&_t=${Date.now()}`);
+                if (!res.ok) throw new Error('网络请求失败');
+                const data = await res.json();
+                
+                const quote = {
+                    content: data.hitokoto,
+                    author: data.from ? `—— ${data.from}` : '—— 佚名',
+                };
+                if (data.from_who) quote.author = `—— ${data.from_who}《${data.from}》`;
+
+                localStorage.setItem(cacheKey, JSON.stringify(quote));
+                quoteContentEl.innerText = `“${quote.content}”`;
+                quoteAuthorEl.innerText = quote.author;
+            } catch (error) {
+                quoteContentEl.innerText = "“星光不问赶路人，时光不负有心人。”";
+                quoteAuthorEl.innerText = "—— 大肥鱼为你加油";
+            }
+        }
+
+        // =====================================================================
+        // ===================== 🤖 自动打卡核心逻辑区 =========================
+        // =====================================================================
+        function runAutoCheckIn() {
+            const today = getTodayStr();
+            const lastAutoDate = localStorage.getItem('lastAutoDate');
+            if (lastAutoDate === today) return;
+
+            let autoCount = 0;
+            items.forEach(item => {
+                if (item.type === 'auto') {
+                    const hasRecord = item.records.some(r => r.date === today);
+                    if (!hasRecord) {
+                        item.records.push({ date: today, time: getTimeStr(), note: '大肥鱼自动打卡~' });
+                        autoCount++;
+                    }
+                }
+            });
+
+            if (autoCount > 0) {
+                localStorage.setItem('mySuperItems', JSON.stringify(items));
+                setTimeout(() => { showToast(`咕噜~ 大肥鱼帮你自动打了 ${autoCount} 个卡！`, 'success'); }, 1000);
+            }
+            localStorage.setItem('lastAutoDate', today);
+        }
+
+        // =====================================================================
+        // ===================== 🐟 打卡与日志核心逻辑 =========================
+        // =====================================================================
+        function quickCheckIn(id) {
+            const item = items.find(i => i.id === id);
+            const today = getTodayStr();
+            if ((item.type === 'day' || item.type === 'auto') && item.records.some(r => r.date === today)) {
+                return showToast('喂喂！今天已经打过卡啦！(｀へ´*)', 'error');
+            }
+            item.records.push({ date: today, time: getTimeStr(), note: '' });
+            saveData();
+            showToast('咕噜~ 极速打卡成功！+1', 'success');
+        }
+
+        function openLogCheckInModal(id) {
+            const item = items.find(i => i.id === id);
+            const today = getTodayStr();
+            if ((item.type === 'day' || item.type === 'auto') && item.records.some(r => r.date === today)) {
+                return showToast('今天已经打过卡啦，请去日历修改日志！', 'info');
+            }
+            pendingCheckInItemId = id;
+            document.getElementById('logCheckInTitle').innerText = `✍️ ${item.name} - 写日志并打卡`;
+            document.getElementById('logCheckInInput').value = ''; 
+            showModal('logCheckInModal');
+        }
+
+        function submitLogCheckIn() {
+            const note = document.getElementById('logCheckInInput').value.trim();
+            const item = items.find(i => i.id === pendingCheckInItemId);
+            const today = getTodayStr();
+            if (item) {
+                item.records.push({ date: today, time: getTimeStr(), note: note });
+                saveData();
+                closeModal(null, 'logCheckInModal');
+                showToast('今日份坚持已入账！', 'success');
+            }
+            pendingCheckInItemId = null;
+        }
+
+        function openEditLogModal(itemId, dateStr, timeStr) {
+            const item = items.find(i => i.id === itemId);
+            const record = item.records.find(r => r.date === dateStr && r.time === timeStr);
+            if (!record) return;
+            editingLogInfo = { itemId, dateStr, timeStr };
+            document.getElementById('editLogModalTitle').innerText = `✏️ ${item.name} - 修改日志`;
+            document.getElementById('editLogInput').value = record.note || '';
+            showModal('editLogModal');
+        }
+
+        function saveEditLog() {
+            const newNote = document.getElementById('editLogInput').value.trim();
+            const item = items.find(i => i.id === editingLogInfo.itemId);
+            if (!item) return;
+            const record = item.records.find(r => r.date === editingLogInfo.dateStr && r.time === editingLogInfo.timeStr);
+            if (record) {
+                record.note = newNote;
+                saveData(); 
+                closeModal(null, 'editLogModal');
+                showDetail(editingLogInfo.dateStr); 
+                showToast('日志修改成功啦！', 'success');
+            }
+        }
+
+        function undoLastCheckIn(id) {
+            const item = items.find(i => i.id === id);
+            if (item.records.length === 0) return;
+            item.records.pop(); 
+            saveData();
+            showToast("咕噜……刚才那次不算 (￣^￣)", 'success');
+        }
+
+        // =====================================================================
+        // ===================== 项目管理逻辑 ==================================
+        // =====================================================================
+        function addItem() {
+            const nameInput = document.getElementById('itemName');
+            const typeInput = document.getElementById('itemType');
+            const colorInput = document.getElementById('itemColor');
+            const name = nameInput.value.trim();
+            if (!name) return showToast('咦？输入框比本鱼的口袋还空呢！', 'error');
+            
+            items.push({ id: Date.now(), name: name, type: typeInput.value, color: colorInput.value, records: [] });
+            nameInput.value = '';
+            colorInput.value = '#007bff';
+            saveData();
+            closeModal(null, 'addItemModal');
+            
+            if (typeInput.value === 'auto') {
+                showToast(`“${name}” 已开启自动模式，本鱼包了！`, 'success');
+                localStorage.removeItem('lastAutoDate');
+                runAutoCheckIn();
+            } else {
+                showToast(`“${name}” 住进小本本啦！`, 'success');
+            }
+        }
+
+        function openActionMenu(id) {
+            if (isSorting) return; 
+            const item = items.find(i => i.id === id);
+            document.getElementById('actionMenuTitle').innerText = `⚙️ 管理【${item.name}】`;
+            const menuBody = document.getElementById('actionMenuBody');
+            menuBody.innerHTML = `
+                <button class="action-menu-btn" onclick="openUndoModal(${item.id});">
+                    <span>↩️ 撤销更多记录</span>
+                </button>
+                <button class="action-menu-btn" onclick="openEditModal(${item.id});">
+                    <span>✏️ 编辑事项属性</span>
+                </button>
+                <button class="action-menu-btn danger" onclick="deleteItem(${item.id});">
+                    <span>🗑️ 删除此事项</span>
+                </button>
+            `;
+            showModal('actionMenuModal');
+        }
+
+        function deleteItem(id) {
+            closeModal(null, 'actionMenuModal');
+            const item = items.find(i => i.id === id);
+            showConfirm("残忍删除", `真的要残忍地把【${item.name}】扔进海里吗？\n它的历史记录也会一起消失哦！`, () => {
+                items = items.filter(i => i.id !== id);
+                saveData();
+                showToast('项目已删除，大肥鱼帮你清空记忆啦~');
+            });
+        }
+
+        function openEditModal(id) {
+            const item = items.find(i => i.id === id);
+            editingItemId = id;
+            document.getElementById('editName').value = item.name;
+            document.getElementById('editType').value = item.type;
+            document.getElementById('editColor').value = item.color;
+            showModal('editModal');
+        }
+
+        function saveEdit() {
+            const item = items.find(i => i.id === editingItemId);
+            const newName = document.getElementById('editName').value.trim();
+            if (!newName) return showToast('名字不能为空啦！', 'error');
+            const oldType = item.type;
+            item.name = newName;
+            item.type = document.getElementById('editType').value;
+            item.color = document.getElementById('editColor').value;
+            saveData();
+            closeModal(null, 'editModal');
+            showToast('叮！修改成功~', 'success');
+            if (oldType !== 'auto' && item.type === 'auto') {
+                localStorage.removeItem('lastAutoDate');
+                runAutoCheckIn();
+            }
+        }
+
+        // =====================================================================
+        // ===================== 撤销与补签逻辑 ================================
+        // =====================================================================
+        function openUndoModal(id) {
+            const item = items.find(i => i.id === id);
+            currentUndoItemId = id;
+            document.getElementById('undoTitle').innerText = `撤回【${item.name}】`;
+            const undoBody = document.getElementById('undoBody');
+            undoBody.innerHTML = `
+                <button class="action-menu-btn" onclick="executeUndo('today')">
+                    <span>📅 撤回今天的所有打卡</span>
+                </button>
+                <button class="action-menu-btn" onclick="executeUndo('month')">
+                    <span>🗓️ 撤回本月的所有打卡</span>
+                </button>
+                <button class="action-menu-btn danger" onclick="executeUndo('all')">
+                    <span>💣 清空所有历史记录</span>
+                </button>
+            `;
+            showModal('undoModal');
+        }
+
+        function executeUndo(type) {
+            const item = items.find(i => i.id === currentUndoItemId);
+            const today = getTodayStr();
+            const currentMonth = today.substring(0, 7);
+            let confirmMsg = "";
+            let successMsg = "";
+
+            if (type === 'today') {
+                if (item.records.filter(r => r.date === today).length === 0) return showToast('今天还没有记录哦~', 'error');
+                confirmMsg = "确定要撤回今天所有的打卡吗？";
+                successMsg = "哗啦！今天的记录被本鱼冲走啦！";
+            } else if (type === 'month') {
+                if (item.records.filter(r => r.date.startsWith(currentMonth)).length === 0) return showToast('本月还没记录呢！', 'error');
+                confirmMsg = "确定要撤回本月所有的打卡吗？";
+                successMsg = "本月记录已清空~";
+            } else if (type === 'all') {
+                if (item.records.length === 0) return showToast('本来就没有记录呀~', 'error');
+                confirmMsg = `危险操作！\n确定清空【${item.name}】的所有历史记录吗？`;
+                successMsg = "时光倒流！记录全被删掉啦~";
+            }
+
+            closeModal(null, 'undoModal');
+            showConfirm("撤销确认", confirmMsg, () => {
+                if (type === 'today') item.records = item.records.filter(r => r.date !== today);
+                else if (type === 'month') item.records = item.records.filter(r => !r.date.startsWith(currentMonth));
+                else if (type === 'all') item.records = [];
+                saveData();
+                showToast(successMsg);
+            });
+        }
+
+        function undoSpecificRecord(itemId, dateStr, timeStr) {
+            const item = items.find(i => i.id === itemId);
+            showConfirm("单次撤销", `确定要撤销 ${dateStr} ${timeStr} 的这一次打卡吗？`, () => {
+                const index = item.records.findIndex(r => r.date === dateStr && r.time === timeStr);
+                if (index !== -1) {
+                    item.records.splice(index, 1);
+                    saveData();
+                    showDetail(dateStr); 
+                    showToast('时光倒流！这条记录被删掉啦~');
+                }
+            });
+        }
+
+        function openMakeUpList() {
+            const listContainer = document.getElementById('makeUpListContainer');
+            listContainer.innerHTML = '';
+            const availableItems = items.filter(item => {
+                if (item.type === 'count') return true;
+                return !item.records.some(r => r.date === currentDetailDate);
+            });
+            if (availableItems.length === 0) return showToast('这一天所有事项都已经打过卡啦，不用补签！', 'info');
+
+            availableItems.forEach(item => {
+                listContainer.innerHTML += `
+                    <button class="makeup-item-btn" onclick="selectMakeUpItem(${item.id}, '${item.name}')">
+                        <span>${item.name}</span>
+                        <span style="font-size: 12px; color: #007bff; background: #e6f2ff; padding: 4px 8px; border-radius: 6px;">去补签</span>
+                    </button>
+                `;
+            });
+            showModal('makeUpListModal');
+        }
+
+        function selectMakeUpItem(id, name) {
+            makeUpTargetItemId = id;
+            document.getElementById('selectedMakeUpItemName').innerText = name;
+            document.getElementById('makeUpLogInput').value = '';
+            showModal('makeUpLogModal');
+        }
+
+        function backToMakeUpList() {
+            openMakeUpList();
+        }
+
+        function submitMakeUp() {
+            const note = document.getElementById('makeUpLogInput').value.trim();
+            const item = items.find(i => i.id === makeUpTargetItemId);
+            if (!item) return;
+            item.records.push({ date: currentDetailDate, time: getTimeStr(), note: note || '补签' });
+            saveData();
+            closeModal(null, 'makeUpLogModal');
+            showDetail(currentDetailDate); 
+            showToast('🪄 补签成功！时光倒流啦~', 'success');
+        }
+
+        // =====================================================================
+        // ===================== 🎨 背景控制区 =================================
+        // =====================================================================
+        function openBgModal() { 
+            const savedOverlay = localStorage.getItem('customOverlay') || '75';
+            const savedBlur = localStorage.getItem('customBlur') || '3';
+            document.getElementById('overlaySlider').value = savedOverlay;
+            document.getElementById('overlayValDisplay').innerText = savedOverlay + '%';
+            document.getElementById('blurSlider').value = savedBlur;
+            document.getElementById('blurValDisplay').innerText = savedBlur + 'px';
+            showModal('bgModal'); 
+        }
+
+        function updateOverlay(val) {
+            document.getElementById('overlayValDisplay').innerText = val + '%';
+            document.getElementById('overlay-layer').style.backgroundColor = `rgba(255, 255, 255, ${val / 100})`;
+            localStorage.setItem('customOverlay', val);
+        }
+
+        function updateBlur(val) {
+            document.getElementById('blurValDisplay').innerText = val + 'px';
+            document.getElementById('overlay-layer').style.backdropFilter = `blur(${val}px)`;
+            localStorage.setItem('customBlur', val);
+        }
+
+        function applyBg(url) {
+            document.getElementById('bg-layer').style.backgroundImage = `url(${url})`;
+            localStorage.setItem('customBg', url);
+            showToast('背景图片已应用~', 'success');
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.size > 4 * 1024 * 1024) return showToast('图片太大啦！请选小于4MB的哦', 'error');
+            const reader = new FileReader();
+            reader.onload = function(e) { applyBg(e.target.result); };
+            reader.readAsDataURL(file);
+            event.target.value = ''; 
+        }
+
+        function setBgFromUrl() {
+            const url = document.getElementById('urlBgInput').value.trim();
+            if (!url) return showToast('先填个图片链接呀！', 'error');
+            applyBg(url);
+            document.getElementById('urlBgInput').value = '';
+        }
+
+        function resetBg() {
+            document.getElementById('bg-layer').style.backgroundImage = 'linear-gradient(180deg, #eef7ff 0%, #f8fbff 100%)';
+            localStorage.removeItem('customBg');
+            document.getElementById('overlay-layer').style.backgroundColor = 'rgba(255, 255, 255, 0.75)';
+            document.getElementById('overlay-layer').style.backdropFilter = 'blur(3px)';
+            localStorage.removeItem('customOverlay');
+            localStorage.removeItem('customBlur');
+            document.getElementById('overlaySlider').value = 75;
+            document.getElementById('overlayValDisplay').innerText = '75%';
+            document.getElementById('blurSlider').value = 3;
+            document.getElementById('blurValDisplay').innerText = '3px';
+            showToast('已恢复默认清爽背景~', 'success');
+        }
+
+        function loadBg() {
+            const savedBg = localStorage.getItem('customBg');
+            if (savedBg) document.getElementById('bg-layer').style.backgroundImage = `url(${savedBg})`;
+            const savedOverlay = localStorage.getItem('customOverlay') || '75';
+            const savedBlur = localStorage.getItem('customBlur') || '3';
+            document.getElementById('overlay-layer').style.backgroundColor = `rgba(255, 255, 255, ${savedOverlay / 100})`;
+            document.getElementById('overlay-layer').style.backdropFilter = `blur(${savedBlur}px)`;
+        }
+
+        // =====================================================================
+        // ===================== 图表与日历渲染区 ==============================
+        // =====================================================================
+        function switchPeriod(period) {
+            chartPeriod = period;
+            const btns = document.querySelectorAll('.period-btn');
+            btns.forEach(btn => btn.classList.remove('active'));
+            if (period === 'today') btns[0].classList.add('active');
+            else if (period === 'week') btns[1].classList.add('active');
+            else if (period === 'month') btns[2].classList.add('active');
+            else btns[3].classList.add('active');
+            renderChart();
+        }
+
+        function renderChart() {
+            const chart = document.getElementById('chartContainer');
+            const chartTotalHtml = document.getElementById('chartTotalHtml');
+            if (items.length === 0) {
+                chart.innerHTML = '<div style="text-align: center; color: #bdc3c7; font-size: 13px;">暂无数据，快去打卡吧~</div>';
+                chartTotalHtml.innerHTML = '';
+                return;
+            }
+
+            const now = new Date();
+            const todayStr = getTodayStr();
+            let startDate = '';
+            if (chartPeriod === 'today') startDate = todayStr;
+            else if (chartPeriod === 'week') {
+                const dayOfWeek = now.getDay() || 7;
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - dayOfWeek + 1);
+                startDate = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+            } else if (chartPeriod === 'month') startDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+            else startDate = '1970-01-01';
+
+            let chartData = items.map(item => {
+                let count = 0;
+                if (chartPeriod === 'all') count = item.records.length;
+                else count = item.records.filter(r => r.date >= startDate && r.date <= todayStr).length;
+                return { ...item, periodCount: count };
+            }).filter(item => item.periodCount > 0);
+
+            if (chartData.length === 0) {
+                let emptyMsg = chartPeriod === 'today' ? '今天还没打卡哦，快去打卡吧！' : '该时间段内暂无记录哦~';
+                chart.innerHTML = `<div style="text-align: center; color: #bdc3c7; font-size: 13px;">${emptyMsg}</div>`;
+                chartTotalHtml.innerHTML = '';
+                return;
+            }
+
+            chartData.sort((a, b) => b.periodCount - a.periodCount);
+            let maxCount = Math.max(...chartData.map(i => i.periodCount), 1); 
+            let totalCount = chartData.reduce((sum, item) => sum + item.periodCount, 0);
+            let totalLabel = chartPeriod === 'today' ? '今日共打卡' : '该时间段共打卡';
+            chartTotalHtml.innerHTML = `${totalLabel} <span>${totalCount}</span> 次`;
+
+            let html = '';
+            chartData.forEach(item => {
+                const percent = (item.periodCount / maxCount) * 100;
+                html += `
+                    <div class="chart-item">
+                        <div class="chart-label" title="${item.name}">${item.name}</div>
+                        <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: ${percent}%; background-color: ${item.color};"></div></div>
+                        <div class="chart-value" style="color: ${item.color};">${item.periodCount}</div>
+                    </div>
+                `;
+            });
+            chart.innerHTML = html;
+        }
+
+        function jumpToMonth(event) {
+            const val = event.target.value;
+            if (!val) return;
+            const [y, m] = val.split('-');
+            viewDate.setFullYear(parseInt(y));
+            viewDate.setMonth(parseInt(m) - 1);
+            renderCalendar();
+        }
+
+        function renderApp() {
+            loadDailyQuote(); 
+            renderList();
+            renderCalendar();
+            renderChart();
+        }
+
+        function renderList() {
+            const list = document.getElementById('itemList');
+            const emptyMsg = document.getElementById('emptyMsg');
+            const today = getTodayStr();
+            list.innerHTML = '';
+            
+            if (items.length === 0) {
+                emptyMsg.style.display = 'block';
+                document.getElementById('sortToggleBtn').style.display = 'none';
+                return;
+            }
+            emptyMsg.style.display = 'none';
+            document.getElementById('sortToggleBtn').style.display = 'block';
+
+            items.forEach((item, index) => {
+                const total = item.records.length; 
+                let isCompletedToday = false;
+                if (item.type === 'day' || item.type === 'auto') {
+                    isCompletedToday = item.records.some(r => r.date === today);
+                }
+                
+                const btnClass = isCompletedToday ? 'btn-checkin completed' : 'btn-checkin';
+                let btnText = '+ 打卡';
+                if (isCompletedToday) btnText = item.type === 'auto' ? '🤖 已自动' : '✅ 已完成';
+                
+                const typeLabel = item.type === 'count' ? '次数' : (item.type === 'day' ? '天数' : '自动');
+                const btnStyle = isCompletedToday ? '' : `style="background-color: ${item.color};"`;
+                const textStyle = `style="color: ${item.color};"`;
+
+                let quickUndoBtn = '';
+                if (total > 0 && !isSorting) { 
+                    quickUndoBtn = `<button class="btn-undo-quick" onclick="event.stopPropagation(); undoLastCheckIn(${item.id})" title="撤销最近一次">↩️</button>`;
+                }
+
+                let logBtn = '';
+                if (!isCompletedToday && !isSorting) { 
+                    logBtn = `<button class="btn-log" onclick="event.stopPropagation(); openLogCheckInModal(${item.id})" title="写日志并打卡">📝</button>`;
+                }
+
+                let sortBtnsHtml = '';
+                if (isSorting) {
+                    sortBtnsHtml = `
+                        <button class="btn-sort-arrow" onclick="event.stopPropagation(); moveItem(${index}, -1)" ${index === 0 ? 'disabled' : ''}>↑</button>
+                        <button class="btn-sort-arrow" onclick="event.stopPropagation(); moveItem(${index}, 1)" ${index === items.length - 1 ? 'disabled' : ''}>↓</button>
+                    `;
+                }
+
+                list.innerHTML += `
+                    <div class="item" onclick="openActionMenu(${item.id})">
+                        <div class="item-info">
+                            <span class="item-name">${item.name}</span>
+                            <div class="item-meta">
+                                <span class="item-type">${typeLabel}</span>
+                                <span class="item-total" ${textStyle}>累计: ${total}</span>
+                            </div>
+                        </div>
+                        <div class="action-btns" onclick="event.stopPropagation()">
+                            ${isSorting ? sortBtnsHtml : `
+                                ${quickUndoBtn}
+                                ${logBtn}
+                                <button class="${btnClass}" ${btnStyle} onclick="quickCheckIn(${item.id})" ${isCompletedToday ? 'disabled' : ''}>${btnText}</button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function changeMonth(offset) {
+            viewDate.setMonth(viewDate.getMonth() + offset);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const cal = document.getElementById('calendar');
+            const picker = document.getElementById('calendarMonthPicker');
+            cal.innerHTML = '';
+            const year = viewDate.getFullYear();
+            const month = viewDate.getMonth();
+            picker.value = `${year}-${String(month + 1).padStart(2, '0')}`;
+            
+            ['日', '一', '二', '三', '四', '五', '六'].forEach(w => cal.innerHTML += `<div class="weekday">${w}</div>`);
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDay; i++) cal.innerHTML += `<div class="day empty"></div>`;
+
+            let dateCountMap = {};
+            items.forEach(item => {
+                item.records.forEach(r => {
+                    dateCountMap[r.date] = (dateCountMap[r.date] || 0) + 1;
+                });
+            });
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+                const count = dateCountMap[dateStr] || 0;
+                const hasRecord = count > 0;
+                const dayClass = hasRecord ? 'day has-record' : 'day';
+                const badgeHtml = hasRecord ? `<span class="day-badge">${count}次</span>` : '';
+                cal.innerHTML += `<div class="${dayClass}" onclick="showDetail('${dateStr}')"><span>${i}</span>${badgeHtml}</div>`;
+            }
+        }
+
+        function showDetail(dateStr) {
+            currentDetailDate = dateStr; 
+            const modalDate = document.getElementById('modalDate');
+            const modalBody = document.getElementById('modalBody');
+            modalDate.innerText = `${dateStr} 的打卡详情`;
+            modalBody.innerHTML = '';
+            let hasAnyRecord = false;
+
+            items.forEach(item => {
+                const dayRecords = item.records.filter(r => r.date === dateStr);
+                if (dayRecords.length > 0) {
+                    hasAnyRecord = true;
+                    let recordsHtml = dayRecords.map(r => `
+                        <div class="record-item">
+                            <div class="record-top">
+                                <div>
+                                    <span style="color:#555; font-weight:bold;">打卡成功 +1</span>
+                                    <span class="record-time">(${r.time})</span>
+                                </div>
+                                <div>
+                                    <button class="btn-edit-log" onclick="openEditLogModal(${item.id}, '${r.date}', '${r.time}')">✏️ 日志</button>
+                                    <button class="btn-undo-single" onclick="undoSpecificRecord(${item.id}, '${r.date}', '${r.time}')">撤销</button>
+                                </div>
+                            </div>
+                            ${r.note ? `<div class="record-note">${r.note.replace(/\n/g, '<br>')}</div>` : ''}
+                        </div>
+                    `).join('');
+
+                    modalBody.innerHTML += `
+                        <div style="margin-bottom: 20px; background: #fafbfc; padding: 16px; border-radius: 16px;">
+                            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="font-weight: bold; color: ${item.color}; display: flex; align-items: center; font-size:15px;">
+                                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${item.color}; margin-right:8px;"></span>
+                                    ${item.name}
+                                </div>
+                                <span style="font-size:12px; color:#95a5a6; background:#eef2f6; padding:2px 8px; border-radius:10px;">共${dayRecords.length}次</span>
+                            </div>
+                            ${recordsHtml}
+                        </div>
+                    `;
+                }
+            });
+
+            if (!hasAnyRecord) modalBody.innerHTML = '<div style="text-align: center; color: #bdc3c7; padding: 40px 0;">这一天没有打卡记录哦~</div>';
+            showModal('detailModal');
+        }
+
+        function openDataModal(mode) {
+            const title = document.getElementById('dataModalTitle');
+            const textarea = document.getElementById('dataTextarea');
+            const btn = document.getElementById('dataActionBtn');
+            
+            if (mode === 'export') {
+                title.innerText = "📤 数据备份";
+                textarea.value = JSON.stringify(items);
+                textarea.readOnly = true;
+                btn.innerText = "一键复制带走";
+                btn.onclick = () => {
+                    textarea.select();
+                    document.execCommand('copy');
+                    showToast('已复制！快存到备忘录吧~', 'success');
+                };
+            } else {
+                title.innerText = "📥 数据恢复";
+                textarea.value = "";
+                textarea.readOnly = false;
+                btn.innerText = "确认导入并覆盖";
+                btn.onclick = () => {
+                    try {
+                        const parsed = JSON.parse(textarea.value);
+                        if (Array.isArray(parsed)) {
+                            closeModal(null, 'dataModal');
+                            showConfirm("数据覆盖", "⚠️ 导入将覆盖当前所有数据，确定吗？", () => {
+                                items = parsed;
+                                saveData();
+                                showToast('满血复活！数据已找回~', 'success');
+                            });
+                        } else showToast('这段代码看不懂耶...', 'error');
+                    } catch(e) { showToast('数据格式错误！', 'error'); }
+                };
+            }
+            showModal('dataModal');
+        }
+
+        // 初始化应用
+        loadBg(); 
+        runAutoCheckIn(); 
+        renderApp(); 
+    </script>
+</body>
+</html>
